@@ -1,0 +1,15 @@
+{
+  "name": "phrajd-watering-dashboard",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --env-file=.env server.js"
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "^7.11.6",
+    "express": "^4.21.2",
+    "mqtt": "^5.10.3"
+  }
+}

@@ -1,0 +1,748 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ระบบรดน้ำต้นไม้ PhraJD</title>
+  <style>
+    :root {
+      --bg: #0f1a14; --card: #17261d; --line: #26392d; --text: #e7f2ea; --muted: #8fa898;
+      --ok: #3ccf7a; --bad: #ef5b5b; --warn: #f2b84b; --water: #4aa8ff; --btn: #24402f;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Sarabun", sans-serif; background: var(--bg); color: var(--text); }
+    header { padding: 16px 20px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+    h1 { font-size: 1.3rem; margin: 0; }
+    h2 { font-size: 1.05rem; margin: 0 0 12px; }
+    main { max-width: 1100px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+    section { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+    .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+    .tile { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: #13201a; }
+    .tile.active { border-color: var(--water); box-shadow: 0 0 0 1px var(--water) inset; }
+    .tile .title { font-weight: 600; }
+    .tile .sub { color: var(--muted); font-size: .85rem; margin-top: 2px; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: .85rem; background: #22332a; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+    .on .dot { background: var(--ok); } .off .dot { background: var(--bad); } .unknown .dot { background: var(--warn); }
+    .open .dot { background: var(--water); }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+    button { font: inherit; border: 0; border-radius: 10px; padding: 9px 14px; background: var(--btn); color: var(--text); cursor: pointer; }
+    button:hover:not(:disabled) { filter: brightness(1.2); }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    button.primary { background: #2f7d4f; } button.danger { background: #8a2f2f; } button.water { background: #275d8f; }
+    button.small { padding: 6px 12px; }
+    .progress { height: 8px; border-radius: 4px; background: #22332a; overflow: hidden; margin-top: 8px; }
+    .progress > div { height: 100%; background: var(--water); width: 0; transition: width .5s; }
+    .phase { font-size: 1.1rem; font-weight: 600; }
+    .muted { color: var(--muted); font-size: .9rem; }
+    .note { background: #2b2a17; border: 1px solid #4d4720; color: #f1e3a4; border-radius: 10px; padding: 8px 12px; font-size: .9rem; }
+    table { width: 100%; border-collapse: collapse; }
+    td { padding: 6px 4px; border-bottom: 1px solid var(--line); }
+    input[type=number], input[type=time], select { font: inherit; background: #0f1a14; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+    input[type=number] { width: 72px; text-align: center; }
+    .stepper { display: inline-flex; gap: 4px; align-items: center; }
+    .logs { max-height: 260px; overflow: auto; font-size: .9rem; }
+    .logs div { padding: 4px 0; border-bottom: 1px dashed var(--line); }
+    .logs time { color: var(--muted); margin-right: 8px; }
+    #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: #263b2f; padding: 10px 16px; border-radius: 10px; display: none; max-width: 90vw; }
+    #toast.err { background: #6b2525; }
+    .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    .seg button { border-radius: 0; background: #13201a; }
+    .seg button.active.on { background: #2f7d4f; }
+    .seg button.active.off { background: #8a2f2f; }
+    .seg button.active:disabled { opacity: 1; cursor: default; font-weight: 600; }
+    .rounds { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+    .tile.disabled .round-body { opacity: .45; }
+    .round-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .round-head .title { font-size: 1.05rem; }
+    #loading { position: fixed; inset: 0; z-index: 10; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 20px; text-align: center; }
+    #loading.hidden { display: none; }
+    .spinner { width: 44px; height: 44px; border: 4px solid var(--line); border-top-color: var(--ok); border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="loading">
+    <div class="spinner"></div>
+    <div style="font-weight:600">ระบบรดน้ำต้นไม้ PhraJD</div>
+    <div id="loadingText" class="muted">กำลังติดต่อเซิร์ฟเวอร์...</div>
+  </div>
+  <header>
+    <h1>ระบบรดน้ำต้นไม้ PhraJD</h1>
+    <div class="row" style="margin:0">
+      <span id="connBadge" class="badge unknown"><span class="dot"></span><span>กำลังโหลด...</span></span>
+      <span id="deviceTime" class="muted"></span>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>สถานะการทำงาน</h2>
+      <div class="row" style="margin:0 0 12px">
+        <span>ตั้งเวลาเปิด-ปิดอัตโนมัติ</span>
+        <span class="seg">
+          <button id="btnAutoOn" class="small on">เปิดใช้งาน</button>
+          <button id="btnAutoOff" class="small off">ปิดใช้งาน</button>
+        </span>
+      </div>
+      <div id="phaseText" class="phase">-</div>
+      <div id="phaseDetail" class="muted"></div>
+      <div class="progress"><div id="phaseProgress"></div></div>
+      <div class="row">
+        <select id="startRound"></select>
+        <button id="btnStart" class="primary">เริ่มรดน้ำทันที</button>
+        <button id="btnStop" class="danger">หยุด / ปิดทั้งหมด</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>สถานะบอร์ด</h2>
+      <div id="boards" class="grid"></div>
+    </section>
+
+    <section>
+      <h2>ปั๊มน้ำและวาล์ว</h2>
+      <div id="valves" class="grid"></div>
+    </section>
+
+    <section>
+      <h2>ทดสอบ (สั่งเปิด/ปิดทันที)</h2>
+      <p class="note">ปั๊มจะเปิดได้ต่อเมื่อมีวาล์วเปิดอยู่อย่างน้อย 1 ตัว และระดับน้ำแท็งก์เจดีย์ไม่ต่ำกว่า 40% ถ้าปิดวาล์วตัวสุดท้ายขณะปั๊มทำงาน ระบบจะปิดปั๊มก่อนแล้วจึงปิดวาล์ว และถ้าไม่มีการกดเกิน 30 นาที ระบบจะปิดทั้งหมดเอง</p>
+      <div id="testNote" class="muted"></div>
+      <div id="testGrid" class="grid" style="margin-top:10px"></div>
+    </section>
+
+    <section>
+      <h2>ตั้งเวลารดน้ำ (วันละไม่เกิน 4 รอบ)</h2>
+      <div id="roundCards" class="grid rounds"></div>
+      <div id="overlapWarn" class="note" style="display:none; margin-top:10px"></div>
+      <div class="row">
+        <button id="btnSave" class="primary">บันทึกการตั้งค่า</button>
+        <button id="btnReset" class="small">ยกเลิกการแก้ไข</button>
+        <span id="dirtyNote" class="muted"></span>
+      </div>
+      <div class="muted" style="margin-top:6px">แต่ละรอบจะเปิดวาล์ว 1 → 7 ทีละตัว ตามจำนวนนาทีที่ตั้ง (1-240 นาทีต่อวาล์ว)</div>
+    </section>
+
+    <section>
+      <h2>บันทึกเหตุการณ์ (3 วันล่าสุด)</h2>
+      <div id="logs" class="logs"></div>
+    </section>
+  </main>
+
+  <div id="toast"></div>
+
+  <script src="/vendor/mqtt.min.js"></script>
+  <script>
+    const VALVES = [
+      { node: 2, idx: 0, name: 'วาล์ว 1', board: 'บอร์ด 2' },
+      { node: 2, idx: 1, name: 'วาล์ว 2', board: 'บอร์ด 2' },
+      { node: 2, idx: 2, name: 'วาล์ว 3', board: 'บอร์ด 2' },
+      { node: 2, idx: 3, name: 'วาล์ว 4', board: 'บอร์ด 2' },
+      { node: 3, idx: 0, name: 'วาล์ว 5', board: 'บอร์ด 3' },
+      { node: 4, idx: 0, name: 'วาล์ว 6', board: 'บอร์ด 4' },
+      { node: 4, idx: 1, name: 'วาล์ว 7', board: 'บอร์ด 4' }
+    ];
+    const BOARD_INFO = {
+      2: 'รีเลย์ 4 ช่อง (วาล์ว 1-4)',
+      3: 'รีเลย์ 1 ช่อง (วาล์ว 5)',
+      4: 'รีเลย์ 2 ช่อง (วาล์ว 6-7)'
+    };
+    const PHASE_TEXT = {
+      idle: 'ว่าง (รอรอบถัดไป)',
+      opening: 'กำลังเปิดวาล์ว...',
+      running: 'กำลังรดน้ำ',
+      finishing: 'กำลังปิดปั๊มและวาล์ว',
+      manual: 'โหมดทดสอบ'
+    };
+    const AUTO_PHASES = ['opening', 'running', 'finishing'];
+    const ROUND_COUNT = 4;
+    const DEFAULT_TIMES = [[2, 0], [6, 0], [12, 0], [17, 0]];
+    const STATE_STALE_MS = 30000;
+    const LOG_LIMIT = 500;
+    const READY_TIMEOUT_MS = 15000;
+    const RESUME_AFTER_HIDDEN_MS = 5000;
+
+    // Live status comes straight from EMQX (subscribe-only account), not from the server.
+    const live = {
+      error: '',
+      mqttConnected: false,
+      masterStatus: 'unknown',
+      device: null,
+      deviceReceivedAt: 0,
+      config: null,
+      logs: []
+    };
+    let latest = null;
+    let formDirty = false;
+    let savedAt = 0;
+    let mqttCfg = null;
+    let mqttClient = null;
+    // The loading screen stays up after each (re)connect until the master's current state is known.
+    let waitSince = Date.now();
+    let settled = false;
+    let hiddenAt = 0;
+    const $ = (id) => document.getElementById(id);
+    const pad = (n) => String(n).padStart(2, '0');
+
+    // Normalizes configs published by older firmware (single round / per-valve durations) to 4 rounds.
+    function getConfig() {
+      const c = latest?.config;
+      if (!c) return null;
+      const oldRounds = Array.isArray(c.rounds) ? c.rounds
+        : [{ enabled: true, startHour: c.startHour, startMinute: c.startMinute, durations: c.durations }];
+      const rounds = [];
+      for (let i = 0; i < ROUND_COUNT; i++) {
+        const r = oldRounds[i];
+        if (!r) {
+          rounds.push({ enabled: false, startHour: DEFAULT_TIMES[i][0], startMinute: DEFAULT_TIMES[i][1], duration: 30 });
+          continue;
+        }
+        const duration = r.duration ?? Math.max(1, ...(r.durations || [30]));
+        rounds.push({ enabled: r.enabled, startHour: r.startHour, startMinute: r.startMinute, duration });
+      }
+      return { autoEnabled: c.autoEnabled ?? true, rounds };
+    }
+
+    function el(tag, className, text) {
+      const e = document.createElement(tag);
+      if (className) e.className = className;
+      if (text !== undefined) e.textContent = text;
+      return e;
+    }
+
+    function badge(cls, text) {
+      const b = el('span', `badge ${cls}`);
+      b.append(el('span', 'dot'), el('span', '', text));
+      return b;
+    }
+
+    function toast(msg, isError = false) {
+      const t = $('toast');
+      t.textContent = msg;
+      t.className = isError ? 'err' : '';
+      t.style.display = 'block';
+      clearTimeout(toast.timer);
+      toast.timer = setTimeout(() => { t.style.display = 'none'; }, 3500);
+    }
+
+    function fmtDuration(sec) {
+      sec = Math.max(0, Math.round(sec));
+      const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+      return h ? `${h} ชม. ${m} นาที` : m ? `${m} นาที ${s} วินาที` : `${s} วินาที`;
+    }
+
+    function nodeOf(id) {
+      return latest?.device?.nodes?.find((n) => n.id === id) || null;
+    }
+
+    function valveState(v) {
+      const n = nodeOf(v.node);
+      if (!latest?.masterOnline || !n || !n.online) return 'unknown';
+      return (n.valves >> v.idx) & 1 ? 'open' : 'closed';
+    }
+
+    function anyValveOpen() {
+      return VALVES.some((v) => valveState(v) === 'open');
+    }
+
+    async function sendCommand(body) {
+      let pw = localStorage.getItem('controlPassword');
+      if (!pw) {
+        pw = prompt('ใส่รหัสควบคุมระบบ');
+        if (!pw) return false;
+      }
+      try {
+        const res = await fetch('/api/command', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-control-password': pw },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 401) localStorage.removeItem('controlPassword');
+        if (!res.ok) { toast(data.error || 'ส่งคำสั่งไม่สำเร็จ', true); return false; }
+        localStorage.setItem('controlPassword', pw);
+        toast('ส่งคำสั่งแล้ว');
+        return true;
+      } catch {
+        toast('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', true);
+        return false;
+      }
+    }
+
+    function renderHeader() {
+      const b = $('connBadge');
+      const online = latest.masterOnline;
+      b.className = `badge ${online ? 'on' : 'off'}`;
+      b.lastChild.textContent = live.error || (!latest.mqttConnected ? 'ไม่ได้เชื่อมต่อ MQTT' : online ? 'บอร์ดหลักออนไลน์' : 'บอร์ดหลักออฟไลน์');
+      const d = latest.device;
+      $('deviceTime').textContent = d?.time ? `เวลาบอร์ด: ${d.time}` : '';
+    }
+
+    function renderPhase() {
+      const d = latest.device;
+      const phase = d?.phase || 'idle';
+      $('phaseText').textContent = latest.masterOnline ? (PHASE_TEXT[phase] || phase) : 'ไม่ทราบสถานะ (บอร์ดหลักออฟไลน์)';
+      let detail = '';
+      let pct = 0;
+      const cfg = getConfig();
+      const roundText = d && d.round >= 0 ? `รอบ ${d.round + 1} · ` : '';
+      if (d && phase === 'running' && d.step >= 0) {
+        const remain = d.stepDurationSec - d.stepElapsedSec;
+        pct = d.stepDurationSec ? (d.stepElapsedSec / d.stepDurationSec) * 100 : 0;
+        detail = `${roundText}${VALVES[d.step].name} (${VALVES[d.step].board}) เหลือ ${fmtDuration(remain)}`;
+      } else if (d && phase === 'opening' && d.step >= 0) {
+        detail = `${roundText}รอยืนยันการเปิด ${VALVES[d.step].name}`;
+      } else if (cfg) {
+        const active = cfg.rounds.map((r, i) => ({ ...r, i })).filter((r) => r.enabled);
+        detail = !cfg.autoEnabled ? 'การตั้งเวลาอัตโนมัติปิดอยู่ ระบบจะไม่รดน้ำเอง'
+          : active.length ? `ตั้งเวลาไว้: ${active.map((r) => `รอบ ${r.i + 1} เวลา ${pad(r.startHour)}:${pad(r.startMinute)} น.`).join(' · ')}`
+          : 'ยังไม่ได้เปิดใช้รอบใด';
+      }
+      $('phaseDetail').textContent = detail;
+      $('phaseProgress').style.width = `${Math.min(100, pct)}%`;
+      const busy = AUTO_PHASES.includes(phase);
+      $('btnStart').disabled = !latest.masterOnline || busy || tankBlocked();
+      $('btnStart').title = tankBlocked() ? tankText() : '';
+      $('startRound').disabled = !latest.masterOnline || busy;
+      $('btnStop').disabled = !latest.masterOnline;
+
+      const autoOn = cfg ? cfg.autoEnabled : null;
+      $('btnAutoOn').classList.toggle('active', autoOn === true);
+      $('btnAutoOff').classList.toggle('active', autoOn === false);
+      $('btnAutoOn').disabled = !latest.masterOnline || autoOn === true;
+      $('btnAutoOff').disabled = !latest.masterOnline || autoOn === false;
+    }
+
+    function renderBoards() {
+      const wrap = $('boards');
+      wrap.replaceChildren();
+      const d = latest.device;
+
+      const master = el('div', 'tile');
+      master.append(el('div', 'title', 'บอร์ด 1 (บอร์ดหลัก)'), el('div', 'sub', 'ควบคุมระบบ + รีเลย์ปั๊ม'));
+      const mRow = el('div', 'row');
+      mRow.append(badge(latest.masterOnline ? 'on' : 'off', latest.masterOnline ? 'ทำงานปกติ' : 'ออฟไลน์'));
+      master.append(mRow);
+      if (d) master.append(el('div', 'sub', `Wi-Fi ${d.rssi} dBm · ทำงานมา ${fmtDuration(d.uptime)}`));
+      wrap.append(master);
+
+      for (const id of [2, 3, 4]) {
+        const n = nodeOf(id);
+        const ok = latest.masterOnline && n?.online;
+        const tile = el('div', 'tile');
+        tile.append(el('div', 'title', `บอร์ด ${id}`), el('div', 'sub', BOARD_INFO[id]));
+        const row = el('div', 'row');
+        row.append(badge(ok ? 'on' : n?.lastSeenSec >= 0 || !latest.masterOnline ? 'off' : 'unknown', ok ? 'ทำงานปกติ' : 'ขาดการติดต่อ'));
+        tile.append(row);
+        if (n && n.lastSeenSec >= 0) {
+          tile.append(el('div', 'sub', `ติดต่อล่าสุด ${fmtDuration(n.lastSeenSec)} ที่แล้ว · Wi-Fi ${n.rssi} dBm · IP ${n.ip}`));
+        } else {
+          tile.append(el('div', 'sub', 'ยังไม่เคยติดต่อ'));
+        }
+        wrap.append(tile);
+      }
+    }
+
+    function pumpLabel() {
+      const d = latest.device;
+      if (!latest.masterOnline || !d) return ['unknown', 'ไม่ทราบ'];
+      return d.pump ? ['open', 'กำลังทำงาน'] : ['closed', 'ปิด'];
+    }
+
+    function valveLabel(v) {
+      const s = valveState(v);
+      return s === 'open' ? ['open', 'เปิด'] : s === 'closed' ? ['closed', 'ปิด'] : ['unknown', 'ไม่ทราบ'];
+    }
+
+    // Older firmware does not report tankOk; treat that as allowed.
+    function tankBlocked() { return latest.device?.tankOk === false; }
+
+    function tankText() {
+      const d = latest.device;
+      if (!d || d.tankMin === undefined) return '';
+      const level = d.tank === null ? 'ไม่ทราบ' : `${Math.round(d.tank)}%`;
+      return `แท็งก์เจดีย์ ${level}${d.tankOk ? '' : ` · ห้ามเปิดปั๊ม (ต้องไม่ต่ำกว่า ${d.tankMin}%)`}`;
+    }
+
+    function renderValves() {
+      const wrap = $('valves');
+      wrap.replaceChildren();
+      const d = latest.device;
+      const [pc, pt] = pumpLabel();
+      const pump = el('div', `tile${pc === 'open' ? ' active' : ''}`);
+      pump.append(el('div', 'title', 'ปั๊มน้ำ'), el('div', 'sub', 'บอร์ด 1'));
+      const pr = el('div', 'row');
+      pr.append(badge(pc, pt));
+      pump.append(pr);
+      if (latest.masterOnline && tankText()) pump.append(el('div', 'sub', tankText()));
+      wrap.append(pump);
+
+      VALVES.forEach((v, i) => {
+        const [cls, text] = valveLabel(v);
+        const isCurrent = d && ['opening', 'running'].includes(d.phase) && d.step === i;
+        const tile = el('div', `tile${cls === 'open' ? ' active' : ''}`);
+        tile.append(el('div', 'title', v.name), el('div', 'sub', `${v.board}${isCurrent ? ' · รอบปัจจุบัน' : ''}`));
+        const row = el('div', 'row');
+        row.append(badge(cls, text));
+        tile.append(row);
+        wrap.append(tile);
+      });
+    }
+
+    function renderTest() {
+      const wrap = $('testGrid');
+      wrap.replaceChildren();
+      const phase = latest.device?.phase || 'idle';
+      const autoBusy = AUTO_PHASES.includes(phase);
+      const canControl = latest.masterOnline && !autoBusy;
+      $('testNote').textContent = !latest.masterOnline ? 'บอร์ดหลักออฟไลน์ ไม่สามารถทดสอบได้'
+        : autoBusy ? 'ระบบกำลังรดน้ำอัตโนมัติ กด "หยุด / ปิดทั้งหมด" ก่อนจึงจะทดสอบได้' : '';
+
+      const [pc, pt] = pumpLabel();
+      const pump = el('div', `tile${pc === 'open' ? ' active' : ''}`);
+      pump.append(el('div', 'title', 'ปั๊มน้ำ'));
+      const pr = el('div', 'row');
+      pr.append(badge(pc, pt));
+      pump.append(pr);
+      const pb = el('div', 'row');
+      const pumpOn = el('button', 'water small', 'เปิดปั๊ม');
+      pumpOn.disabled = !canControl || !anyValveOpen() || latest.device?.pump || tankBlocked();
+      pumpOn.title = tankBlocked() ? tankText() : anyValveOpen() ? '' : 'ต้องเปิดวาล์วอย่างน้อย 1 ตัวก่อน';
+      pumpOn.onclick = () => sendCommand({ action: 'pump', on: true });
+      const pumpOff = el('button', 'small', 'ปิดปั๊ม');
+      pumpOff.disabled = !canControl || !latest.device?.pump;
+      pumpOff.onclick = () => sendCommand({ action: 'pump', on: false });
+      pb.append(pumpOn, pumpOff);
+      pump.append(pb);
+      if (canControl && tankText()) pump.append(el('div', 'sub', tankText()));
+      if (canControl && !anyValveOpen()) pump.append(el('div', 'sub', 'ต้องเปิดวาล์วอย่างน้อย 1 ตัวก่อน'));
+      wrap.append(pump);
+
+      VALVES.forEach((v, i) => {
+        const [cls, text] = valveLabel(v);
+        const nodeOk = nodeOf(v.node)?.online;
+        const tile = el('div', `tile${cls === 'open' ? ' active' : ''}`);
+        tile.append(el('div', 'title', v.name), el('div', 'sub', v.board));
+        const r1 = el('div', 'row');
+        r1.append(badge(cls, text));
+        tile.append(r1);
+        const r2 = el('div', 'row');
+        const open = el('button', 'water small', 'เปิด');
+        open.disabled = !canControl || !nodeOk || cls === 'open';
+        open.onclick = () => sendCommand({ action: 'valve', valve: i, open: true });
+        const close = el('button', 'small', 'ปิด');
+        close.disabled = !canControl || !nodeOk || cls === 'closed';
+        close.onclick = () => sendCommand({ action: 'valve', valve: i, open: false });
+        r2.append(open, close);
+        tile.append(r2);
+        wrap.append(tile);
+      });
+    }
+
+    function buildRoundCards() {
+      const wrap = $('roundCards');
+      for (let r = 0; r < ROUND_COUNT; r++) {
+        const card = el('div', 'tile');
+        card.id = `round${r}`;
+
+        const head = el('div', 'round-head');
+        const enLabel = el('label');
+        const en = el('input');
+        Object.assign(en, { type: 'checkbox', id: `en${r}`, checked: r === 0 });
+        en.onchange = markDirty;
+        enLabel.append(en, document.createTextNode(' เปิดใช้รอบนี้'));
+        head.append(el('div', 'title', `รอบที่ ${r + 1}`), enLabel);
+        card.append(head);
+
+        const timeRow = el('div', 'row');
+        const timeLabel = el('label', '', 'เวลาเริ่ม ');
+        const time = el('input');
+        Object.assign(time, { type: 'time', id: `time${r}`, value: `${pad(DEFAULT_TIMES[r][0])}:${pad(DEFAULT_TIMES[r][1])}` });
+        time.oninput = markDirty;
+        timeLabel.append(time);
+        timeRow.append(timeLabel);
+
+        const durRow = el('div', 'row');
+        const stepper = el('span', 'stepper');
+        const minus = el('button', 'small', '−5');
+        const input = el('input');
+        Object.assign(input, { type: 'number', min: 1, max: 240, step: 1, id: `dur${r}`, value: 30 });
+        const plus = el('button', 'small', '+5');
+        minus.onclick = () => { input.value = Math.max(1, Number(input.value || 0) - 5); markDirty(); };
+        plus.onclick = () => { input.value = Math.min(240, Number(input.value || 0) + 5); markDirty(); };
+        input.oninput = markDirty;
+        stepper.append(minus, input, plus);
+        durRow.append(el('span', '', 'วาล์วละ'), stepper, el('span', 'muted', 'นาที'));
+
+        const sum = el('div', 'muted');
+        sum.id = `sum${r}`;
+        sum.style.marginTop = '8px';
+
+        const body = el('div', 'round-body');
+        body.append(timeRow, durRow, sum);
+        card.append(body);
+        wrap.append(card);
+      }
+    }
+
+    function readForm() {
+      const rounds = [];
+      for (let r = 0; r < ROUND_COUNT; r++) {
+        const [h, m] = ($(`time${r}`).value || '00:00').split(':').map(Number);
+        rounds.push({
+          enabled: $(`en${r}`).checked,
+          startHour: h,
+          startMinute: m,
+          duration: Math.round(Number($(`dur${r}`).value))
+        });
+      }
+      return { rounds };
+    }
+
+    function roundTotal(r) {
+      return Number.isFinite(r.duration) ? r.duration * VALVES.length : 0;
+    }
+
+    function roundsOverlap(a, b) {
+      const s1 = a.startHour * 60 + a.startMinute, e1 = s1 + roundTotal(a);
+      const s2 = b.startHour * 60 + b.startMinute, e2 = s2 + roundTotal(b);
+      const hit = (x1, y1, x2, y2) => x1 < y2 && x2 < y1;
+      return hit(s1, e1, s2, e2) || hit(s1, e1, s2 + 1440, e2 + 1440) || hit(s1 + 1440, e1 + 1440, s2, e2);
+    }
+
+    function updateSummary() {
+      const { rounds } = readForm();
+      rounds.forEach((r, i) => {
+        const total = roundTotal(r);
+        const end = new Date(2000, 0, 1, r.startHour, r.startMinute + total);
+        $(`round${i}`).classList.toggle('disabled', !r.enabled);
+        $(`sum${i}`).textContent = r.enabled
+          ? `รวม ${Math.floor(total / 60)} ชม. ${total % 60} นาที · เสร็จประมาณ ${pad(end.getHours())}:${pad(end.getMinutes())} น.`
+          : 'รอบนี้ปิดอยู่';
+      });
+      const pairs = [];
+      for (let a = 0; a < ROUND_COUNT; a++) {
+        for (let b = a + 1; b < ROUND_COUNT; b++) {
+          if (rounds[a].enabled && rounds[b].enabled && roundsOverlap(rounds[a], rounds[b])) pairs.push(`รอบ ${a + 1} กับรอบ ${b + 1}`);
+        }
+      }
+      const warn = $('overlapWarn');
+      warn.style.display = pairs.length ? 'block' : 'none';
+      warn.textContent = pairs.length ? `ช่วงเวลาทับกัน: ${pairs.join(', ')} — รอบที่ถึงเวลาขณะอีกรอบยังรดน้ำอยู่จะถูกข้าม` : '';
+      $('dirtyNote').textContent = formDirty ? 'ยังไม่ได้บันทึก' : '';
+    }
+
+    function markDirty() { formDirty = true; updateSummary(); }
+
+    function fillForm(config) {
+      if (!config) return;
+      config.rounds.forEach((r, ri) => {
+        $(`en${ri}`).checked = r.enabled;
+        $(`time${ri}`).value = `${pad(r.startHour)}:${pad(r.startMinute)}`;
+        $(`dur${ri}`).value = r.duration;
+      });
+      formDirty = false;
+      updateSummary();
+    }
+
+    function renderLogs() {
+      const wrap = $('logs');
+      wrap.replaceChildren();
+      if (!latest.logs.length) wrap.append(el('div', 'muted', 'ยังไม่มีเหตุการณ์'));
+      for (const log of latest.logs) {
+        const row = el('div');
+        row.append(el('time', '', new Date(log.time).toLocaleString('th-TH')), document.createTextNode(log.text));
+        wrap.append(row);
+      }
+    }
+
+    // History (last 3 days) comes from the server; live MQTT lines received meanwhile are kept on top.
+    async function loadLogs() {
+      try {
+        const res = await fetch('/api/logs', { cache: 'no-store' });
+        if (!res.ok) return;
+        const { logs } = await res.json();
+        const newest = logs[0]?.time || '';
+        live.logs = [...live.logs.filter((l) => l.time > newest), ...logs].slice(0, LOG_LIMIT);
+        refresh();
+      } catch {
+        // History is optional; live logs still work.
+      }
+    }
+
+    function addLog(text) {
+      live.logs.unshift({ time: new Date().toISOString(), text: text.slice(0, 300) });
+      live.logs = live.logs.slice(0, LOG_LIMIT);
+    }
+
+    function parseJson(text) {
+      try {
+        return JSON.parse(text);
+      } catch {
+        return null;
+      }
+    }
+
+    async function connectLive() {
+      if (!mqttCfg) {
+        try {
+          const res = await fetch('/api/mqtt', { cache: 'no-store' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'โหลดการตั้งค่า MQTT ไม่สำเร็จ');
+          mqttCfg = data;
+        } catch (error) {
+          live.error = error.message || 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้';
+          refresh();
+          setTimeout(connectLive, 10000);
+          return;
+        }
+      }
+      live.error = '';
+      const cfg = mqttCfg;
+      const t = (name) => `${cfg.prefix}/${name}`;
+      const client = mqtt.connect(cfg.wsUrl, {
+        username: cfg.username,
+        password: cfg.password,
+        clientId: `phrajd-view-${Math.random().toString(16).slice(2, 10)}`,
+        reconnectPeriod: 5000
+      });
+      mqttClient = client;
+      client.on('connect', () => {
+        if (client !== mqttClient) return;
+        live.mqttConnected = true;
+        client.subscribe([t('master'), t('state'), t('config'), t('log')]);
+        refresh();
+      });
+      client.on('close', () => {
+        if (client !== mqttClient) return;
+        live.mqttConnected = false;
+        refresh();
+      });
+      client.on('message', (topic, payload, packet) => {
+        if (client !== mqttClient) return;
+        const text = payload.toString();
+        if (topic === t('master')) {
+          live.masterStatus = text;
+        } else if (topic === t('state')) {
+          const data = parseJson(text);
+          if (!data) return;
+          live.device = data;
+          // A retained state proves the master is alive only if the board's own timestamp is recent.
+          const boardMs = data.time ? Date.parse(`${data.time.replace(' ', 'T')}+07:00`) : NaN;
+          const recent = Math.abs(Date.now() - boardMs) < STATE_STALE_MS;
+          live.deviceReceivedAt = !packet.retain ? Date.now() : recent ? Math.min(boardMs, Date.now()) : 0;
+        } else if (topic === t('config')) {
+          const data = parseJson(text);
+          if (!data) return;
+          live.config = data;
+        } else if (topic === t('log')) {
+          if (packet.retain) return;
+          addLog(text);
+        }
+        refresh();
+      });
+    }
+
+    function loadingText() {
+      if (live.error) return `${live.error} · กำลังลองใหม่...`;
+      if (!mqttCfg) return 'กำลังติดต่อเซิร์ฟเวอร์...';
+      if (!live.mqttConnected) return 'กำลังเชื่อมต่อ MQTT...';
+      if (settled) return '';
+      const masterKnown = live.masterStatus === 'offline' ||
+        (live.masterStatus === 'online' && live.config && Date.now() - live.deviceReceivedAt < STATE_STALE_MS);
+      // Give up waiting after a while so a silent master still shows as offline instead of loading forever.
+      if (!masterKnown && Date.now() - waitSince < READY_TIMEOUT_MS) return 'กำลังรอสถานะจากบอร์ดหลัก...';
+      settled = true;
+      return '';
+    }
+
+    function renderLoading() {
+      const text = loadingText();
+      $('loading').classList.toggle('hidden', !text);
+      if (text) $('loadingText').textContent = text;
+    }
+
+    // Background tabs often lose their WebSocket silently, so start fresh when the user comes back.
+    function resumeLive() {
+      waitSince = Date.now();
+      settled = false;
+      live.mqttConnected = false;
+      live.masterStatus = 'unknown';
+      live.deviceReceivedAt = 0;
+      const old = mqttClient;
+      mqttClient = null;
+      if (old) old.end(true);
+      refresh();
+      connectLive();
+      loadLogs();
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        hiddenAt = Date.now();
+      } else if (hiddenAt && Date.now() - hiddenAt >= RESUME_AFTER_HIDDEN_MS) {
+        hiddenAt = 0;
+        resumeLive();
+      }
+    });
+
+    function refresh() {
+      const ageMs = live.deviceReceivedAt ? Date.now() - live.deviceReceivedAt : null;
+      latest = {
+        mqttConnected: live.mqttConnected,
+        masterOnline: live.masterStatus === 'online' && ageMs !== null && ageMs < STATE_STALE_MS,
+        device: live.device,
+        config: live.config,
+        logs: live.logs
+      };
+      renderHeader();
+      renderLoading();
+      renderPhase();
+      renderBoards();
+      renderValves();
+      renderTest();
+      renderLogs();
+      // Give the master a moment to publish the new config before refilling the form.
+      if (!formDirty && Date.now() - savedAt > 8000) fillForm(getConfig());
+    }
+
+    buildRoundCards();
+    for (let r = 0; r < ROUND_COUNT; r++) $('startRound').append(new Option(`รอบ ${r + 1}`, String(r)));
+    $('btnReset').onclick = () => { formDirty = false; fillForm(getConfig()); };
+    $('btnSave').onclick = async () => {
+      const cfg = readForm();
+      const valid = cfg.rounds.every((r) => Number.isInteger(r.startHour) && Number.isInteger(r.startMinute) &&
+        Number.isInteger(r.duration) && r.duration >= 1 && r.duration <= 240);
+      if (!valid) {
+        toast('กรุณาตรวจสอบเวลาเริ่ม และเวลาต่อวาล์วต้องอยู่ระหว่าง 1-240 นาที', true);
+        return;
+      }
+      if (await sendCommand({ action: 'config', ...cfg })) {
+        formDirty = false;
+        savedAt = Date.now();
+        updateSummary();
+      }
+    };
+    $('btnAutoOn').onclick = () => sendCommand({ action: 'auto', enabled: true });
+    $('btnAutoOff').onclick = () => {
+      if (confirm('ปิดการตั้งเวลาอัตโนมัติ? ระบบจะไม่รดน้ำตามเวลาจนกว่าจะเปิดใหม่')) sendCommand({ action: 'auto', enabled: false });
+    };
+    $('btnStart').onclick = () => {
+      const r = Number($('startRound').value);
+      if (confirm(`เริ่มรดน้ำตามการตั้งค่าของรอบ ${r + 1} ทันที?`)) sendCommand({ action: 'start', round: r });
+    };
+    $('btnStop').onclick = () => {
+      if (confirm('หยุดการทำงานและปิดปั๊ม/วาล์วทั้งหมด?')) sendCommand({ action: 'stop' });
+    };
+
+    updateSummary();
+    localStorage.removeItem('logs');
+    refresh();
+    connectLive();
+    loadLogs();
+    // Re-render locally so the "master offline" check notices when state messages stop.
+    setInterval(refresh, 3000);
+  </script>
+</body>
+</html>
