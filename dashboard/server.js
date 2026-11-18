@@ -259,4 +259,4 @@ app.post('/api/logs', async (req, res) => {
   }
 });
 
-app.listen(port, () => console.log(`PhraJD watering dashboard on http://localhost:${port}`));
+app.listen(port, () => console.log(`พระเจดีย์ watering dashboard on http://localhost:${port}`));
