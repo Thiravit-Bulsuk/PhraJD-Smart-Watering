@@ -773,7 +773,7 @@ void uploadLogs() {
   serializeJson(d, body);
 
   WiFiClientSecure client;
-  client.setCACert(GTS_ROOT_R1);
+  client.setCACert(GTS_ROOT_R4);
   HTTPClient http;
   http.setTimeout(10000);
   if (!http.begin(client, LOG_URL)) return;
