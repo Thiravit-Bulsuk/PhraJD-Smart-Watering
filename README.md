@@ -6,6 +6,10 @@
 
 <img src="qrcode-webapp.png" alt="QR code เว็บแอป" width="180">
 
+**ที่เก็บโค้ด (repository):** https://github.com/Thiravit-Bulsuk/PhraJD-Smart-Watering
+
+<img src="docs/repo-qr.png" alt="QR code repository" width="180">
+
 ```
 เบราว์เซอร์ ⇄ EMQX MQTT ⇄ บอร์ด 1 (บอร์ดหลัก + รีเลย์ปั๊ม)
                                          │ UDP port 4210 ผ่านเราท์เตอร์ "PhraJD"
